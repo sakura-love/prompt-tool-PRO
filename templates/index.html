@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>专业AI提示词生成器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #e0e0e0;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: rgba(30, 30, 50, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .header h1 span {
+            font-size: 1.2em;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .card h3 {
+            color: #a682ff;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(166, 130, 255, 0.3);
+            border-radius: 10px;
+            font-size: 16px;
+            resize: vertical;
+            min-height: 120px;
+            transition: all 0.3s;
+            font-family: inherit;
+            background: rgba(0, 0, 0, 0.3);
+            color: #e0e0e0;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #a682ff;
+            box-shadow: 0 0 0 3px rgba(166, 130, 255, 0.3), inset 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        textarea::placeholder {
+            color: rgba(224, 224, 224, 0.5);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+            min-width: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid rgba(166, 130, 255, 0.5);
+            color: #a682ff;
+        }
+
+        .btn-outline:hover:not(:disabled) {
+            background: rgba(166, 130, 255, 0.1);
+            border-color: #a682ff;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* 进度指示器 */
+        .progress-section {
+            margin: 20px 0;
+            display: none;
+        }
+
+        .progress-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .progress-steps {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .progress-steps::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 1;
+        }
+
+        .progress-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+            flex: 1;
+        }
+
+        .step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 8px;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .step-circle.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 0 0 3px rgba(166, 130, 255, 0.3);
+            border-color: #a682ff;
+        }
+
+        .step-circle.completed {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+
+        .step-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            text-align: center;
+            max-width: 80px;
+            transition: all 0.3s;
+        }
+
+        .step-label.active {
+            color: #a682ff;
+            font-weight: bold;
+        }
+
+        .step-label.completed {
+            color: #4CAF50;
+        }
+
+        .progress-message {
+            text-align: center;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 10px;
+            font-style: italic;
+            letter-spacing: 0.5px;
+        }
+
+        /* 结果区域 */
+        .result-section {
+            margin-top: 30px;
+        }
+
+        .result-card {
+            border-top: 4px solid #a682ff;
+        }
+
+        .result-block {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .result-block:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .result-block h4 {
+            color: #a682ff;
+            margin-bottom: 12px;
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .result-content {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 60px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+        }
+
+        .prompt {
+            background: rgba(20, 20, 40, 0.8);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+        }
+
+        .prompt-container {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .copy-btn {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            white-space: nowrap;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .copy-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(76, 175, 80, 0.4);
+        }
+
+        /* 工具适配区域 */
+        .tool-adaptation {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .tool-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .tool-tab {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .tool-tab:hover {
+            background: rgba(166, 130, 255, 0.1);
+            border-color: rgba(166, 130, 255, 0.3);
+        }
+
+        .tool-tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #a682ff;
+        }
+
+        .tool-content {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #e0e0e0;
+            min-height: 40px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* 变体区域样式 */
+        .variants-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .variant-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(166, 130, 255, 0.2);
+        }
+
+        .variant-item h5 {
+            color: #a682ff;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .variant-item .result-content {
+            min-height: 50px;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .variant-item .copy-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            width: 100%;
+        }
+
+        /* 历史记录区域 */
+        .history-section {
+            margin-top: 30px;
+        }
+
+        .history-card {
+            border-top: 4px solid #4CAF50;
+        }
+
+        .history-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .history-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .history-input {
+            font-weight: bold;
+            color: #a682ff;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+
+        .history-output {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.8);
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-height: 80px;
+            overflow-y: auto;
+        }
+
+        .history-meta {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 5px;
+        }
+
+        .clear-history-btn {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .clear-history-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(244, 67, 54, 0.4);
+        }
+
+        /* 状态消息 */
+        .message {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+            font-weight: 500;
+        }
+
+        .message.success {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            display: block;
+        }
+
+        .message.error {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            display: block;
+        }
+
+        .message.warning {
+            background: rgba(255, 152, 0, 0.2);
+            color: #ff9800;
+            border: 1px solid rgba(255, 152, 0, 0.3);
+            display: block;
+        }
+
+        /* 信息区域 */
+        .info-section {
+            padding: 0 30px 30px;
+        }
+
+        .info-content {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #a682ff;
+        }
+
+        .info-content h4 {
+            color: #a682ff;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+
+        .info-content p {
+            margin-bottom: 10px;
+            line-height: 1.6;
+            font-size: 14px;
+            color: rgba(224, 224, 224, 0.9);
+        }
+
+        .info-content strong {
+            color: #a682ff;
+        }
+
+        .info-content ul {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        .info-content li {
+            margin-bottom: 8px;
+            color: rgba(224, 224, 224, 0.8);
+        }
+
+        .info-content code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #a682ff;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .progress-steps {
+                flex-wrap: wrap;
+            }
+
+            .step-circle {
+                width: 35px;
+                height: 35px;
+                font-size: 14px;
+            }
+
+            .step-label {
+                font-size: 11px;
+                max-width: 70px;
+            }
+
+            .variants-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 动画效果 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        /* 加载动画 */
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .loading .btn-primary {
+            background: linear-gradient(135deg, #8a95b1 0%, #667eea 100%);
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(166, 130, 255, 0.5);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(166, 130, 255, 0.8);
+        }
+
+        /* 画风格式 */
+        .style-tabs {
+            margin-bottom: 10px;
+        }
+
+        .style-tab {
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+            color: rgba(255, 255, 255, 0.7);
+            white-space: nowrap;
+        }
+
+        .style-tab:hover {
+            background: rgba(166, 130, 255, 0.1);
+            border-color: rgba(166, 130, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .style-tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #a682ff;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><span>🎨</span> 专业AI提示词生成器</h1>
+            <p>基于全网最佳实践，为Stable Diffusion、Midjourney等工具生成专业提示词</p>
+        </header>
+
+        <div class="main-content">
+            <!-- 输入区域 -->
+            <div class="input-section">
+                <div class="card">
+                    <h3>📝 输入你的想法</h3>
+                    <textarea id="userInput" placeholder="例如：森林里的精灵少女，赛博朋克城市中的侦探，未来太空站的宇航员..." rows="4"></textarea>
+
+                    <!-- 画风选择 -->
+                    <div class="style-selector" style="margin-top: 15px;">
+                        <h4 style="color: #a682ff; margin-bottom: 10px; font-size: 14px; font-weight: 600;">🎨 选择画风（可选）</h4>
+                        <div class="style-tabs" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="style-tab active" data-style="" onclick="selectStyle(this, '')">默认</button>
+                            <button class="style-tab" data-style="写实" onclick="selectStyle(this, '写实')">写实</button>
+                            <button class="style-tab" data-style="动漫" onclick="selectStyle(this, '动漫')">动漫</button>
+                            <button class="style-tab" data-style="插画" onclick="selectStyle(this, '插画')">插画</button>
+                            <button class="style-tab" data-style="油画" onclick="selectStyle(this, '油画')">油画</button>
+                            <button class="style-tab" data-style="水彩" onclick="selectStyle(this, '水彩')">水彩</button>
+                            <button class="style-tab" data-style="素描" onclick="selectStyle(this, '素描')">素描</button>
+                            <button class="style-tab" data-style="3D渲染" onclick="selectStyle(this, '3D渲染')">3D渲染</button>
+                            <button class="style-tab" data-style="赛博朋克" onclick="selectStyle(this, '赛博朋克')">赛博朋克</button>
+                            <button class="style-tab" data-style="古风" onclick="selectStyle(this, '古风')">古风</button>
+                            <button class="style-tab" data-style="像素" onclick="selectStyle(this, '像素')">像素</button>
+                            <button class="style-tab" data-style="卡通" onclick="selectStyle(this, '卡通')">卡通</button>
+                            <button class="style-tab" data-style="水墨" onclick="selectStyle(this, '水墨')">水墨</button>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="generateBtn" class="btn btn-primary">
+                            <span>🚀</span> 生成专业提示词
+                        </button>
+                        <button id="clearBtn" class="btn btn-outline">
+                            <span>🗑️</span> 清空输入
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 进度指示器 -->
+            <div id="progressSection" class="progress-section">
+                <div class="progress-container">
+                    <div class="progress-steps">
+                        <div class="progress-step">
+                            <div class="step-circle" id="step1">1</div>
+                            <div class="step-label" id="label1">准备输入</div>
+                        </div>
+                        <div class="progress-step">
+                            <div class="step-circle" id="step2">2</div>
+                            <div class="step-label" id="label2">AI分析</div>
+                        </div>
+                        <div class="progress-step">
+                            <div class="step-circle" id="step3">3</div>
+                            <div class="step-label" id="label3">生成提示词</div>
+                        </div>
+                        <div class="progress-step">
+                            <div class="step-circle" id="step4">4</div>
+                            <div class="step-label" id="label4">保存记录</div>
+                        </div>
+                    </div>
+                    <div class="progress-message" id="progressMessage">准备开始...</div>
+                </div>
+            </div>
+
+            <!-- 结果区域 -->
+            <div id="resultSection" class="result-section" style="display: none;">
+                <div class="card result-card">
+                    <h3>✨ 专业生成结果</h3>
+
+                    <!-- 正向提示词 -->
+                    <div class="result-block">
+                        <h4>✅ 正向提示词</h4>
+                        <div class="prompt-container">
+                            <div id="positivePrompt" class="result-content prompt"></div>
+                            <button class="copy-btn" onclick="copyText('positivePrompt')">复制</button>
+                        </div>
+                    </div>
+
+                    <!-- 负向提示词 -->
+                    <div class="result-block">
+                        <h4>❌ 负向提示词</h4>
+                        <div class="prompt-container">
+                            <div id="negativePrompt" class="result-content prompt"></div>
+                            <button class="copy-btn" onclick="copyText('negativePrompt')">复制</button>
+                        </div>
+                    </div>
+
+                    <!-- 工具适配区域 -->
+                    <div class="result-block">
+                        <h4>🔧 工具适配</h4>
+                        <div class="tool-adaptation">
+                            <div class="tool-tabs">
+                                <div class="tool-tab active" data-tool="stable" onclick="switchTool('stable')">Stable Diffusion</div>
+                                <div class="tool-tab" data-tool="midjourney" onclick="switchTool('midjourney')">Midjourney</div>
+                                <div class="tool-tab" data-tool="dalle" onclick="switchTool('dalle')">DALL·E</div>
+                            </div>
+                            <div id="toolContent" class="tool-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- 变体区域 -->
+                    <div id="variantsSection" class="result-block" style="display: none;">
+                        <h4>🎨 多版本提示词</h4>
+                        <div class="variants-container">
+                            <div class="variant-item">
+                                <h5>基础版</h5>
+                                <div id="variantBasic" class="result-content prompt"></div>
+                                <button class="copy-btn" onclick="copyText('variantBasic')">复制</button>
+                            </div>
+                            <div class="variant-item">
+                                <h5>详细版</h5>
+                                <div id="variantDetailed" class="result-content prompt"></div>
+                                <button class="copy-btn" onclick="copyText('variantDetailed')">复制</button>
+                            </div>
+                            <div class="variant-item">
+                                <h5>艺术版</h5>
+                                <div id="variantArtistic" class="result-content prompt"></div>
+                                <button class="copy-btn" onclick="copyText('variantArtistic')">复制</button>
+                            </div>
+                            <div class="variant-item">
+                                <h5>技术版</h5>
+                                <div id="variantTechnical" class="result-content prompt"></div>
+                                <button class="copy-btn" onclick="copyText('variantTechnical')">复制</button>
+                            </div>
+                            <div class="variant-item">
+                                <h5>创意版</h5>
+                                <div id="variantCreative" class="result-content prompt"></div>
+                                <button class="copy-btn" onclick="copyText('variantCreative')">复制</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 详细分析 -->
+                    <div class="result-block">
+                        <h4>🔍 详细分析</h4>
+                        <div id="sceneAnalysis" class="result-content"></div>
+                    </div>
+
+                    <!-- 艺术风格 -->
+                    <div class="result-block">
+                        <h4>🎨 艺术风格</h4>
+                        <div id="artStyle" class="result-content"></div>
+                    </div>
+
+                    <!-- 光照效果 -->
+                    <div class="result-block">
+                        <h4>💡 光照效果</h4>
+                        <div id="lighting" class="result-content"></div>
+                    </div>
+
+
+                    <!-- 图像生成按钮 -->
+                    <div class="result-block" style="border-bottom: none; margin-bottom: 0;">
+                        <div class="button-group" style="justify-content: center;">
+                            <button id="generateImageBtn" class="btn btn-primary" onclick="generateImage('volcengine')" style="flex: 1; min-width: 200px;">
+                                <span>🔥</span> 火山引擎生成图像
+                            </button>
+                            <button id="openDoubaoBtn" class="btn btn-outline" onclick="generateImage('doubao')" style="flex: 1; min-width: 200px;">
+                                <span>🌐</span> 豆包网页端生成
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 主流图片生成网站 -->
+                    <div class="result-block" style="margin-top: 15px;">
+                        <h4 style="margin-bottom: 12px; font-size: 14px; color: #888;">🎨 其他图片生成网站</h4>
+                        <div class="button-group" style="justify-content: center; flex-wrap: wrap; gap: 10px;">
+                            <a href="https://www.midjourney.com" target="_blank" class="btn btn-outline" style="flex: 1; min-width: 140px; text-decoration: none; display: inline-flex; justify-content: center; align-items: center; gap: 6px;">
+                                <span>🖼️</span> Midjourney
+                            </a>
+                            <a href="https://stability.ai" target="_blank" class="btn btn-outline" style="flex: 1; min-width: 140px; text-decoration: none; display: inline-flex; justify-content: center; align-items: center; gap: 6px;">
+                                <span>🎯</span> Stable Diffusion
+                            </a>
+                            <a href="https://openai.com/dall-e-3" target="_blank" class="btn btn-outline" style="flex: 1; min-width: 140px; text-decoration: none; display: inline-flex; justify-content: center; align-items: center; gap: 6px;">
+                                <span>🤖</span> DALL-E 3
+                            </a>
+                            <a href="https://yiyan.baidu.com" target="_blank" class="btn btn-outline" style="flex: 1; min-width: 140px; text-decoration: none; display: inline-flex; justify-content: center; align-items: center; gap: 6px;">
+                                <span>🔷</span> 文心一格
+                            </a>
+                            <a href="https://tongyi.aliyun.com/wanxiang" target="_blank" class="btn btn-outline" style="flex: 1; min-width: 140px; text-decoration: none; display: inline-flex; justify-content: center; align-items: center; gap: 6px;">
+                                <span>🌟</span> 通义万相
+                            </a>
+                            <a href="https://xinghuo.xfyun.cn" target="_blank" class="btn btn-outline" style="flex: 1; min-width: 140px; text-decoration: none; display: inline-flex; justify-content: center; align-items: center; gap: 6px;">
+                                <span>✨</span> 讯飞星火
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 火山引擎图像生成结果区域 -->
+            <div id="volcengineResultSection" class="result-section" style="display: none; margin-top: 20px;">
+                <div class="card result-card" style="border-top: 4px solid #ff6b6b;">
+                    <h3>🔥 火山引擎图像生成结果</h3>
+
+                    <div class="result-block">
+                        <h4>🖼️ 生成的图像</h4>
+                        <div style="text-align: center; background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 10px;">
+                            <img id="generatedImage" src="" alt="生成的图像" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+                        </div>
+                    </div>
+
+                    <div class="result-block">
+                        <h4>📝 提示词</h4>
+                        <div class="prompt-container">
+                            <div id="volcenginePrompt" class="result-content prompt"></div>
+                            <button class="copy-btn" onclick="copyText('volcenginePrompt')">复制</button>
+                        </div>
+                    </div>
+
+                    <div class="result-block">
+                        <h4>💾 保存图像</h4>
+                        <button id="saveImageBtn" class="btn btn-primary" onclick="saveImage()" style="width: 100%; min-width: auto;">
+                            <span>⬇️</span> 保存到本地
+                        </button>
+                    </div>
+
+                    <div class="result-block" style="border-bottom: none;">
+                        <h4>💡 提示</h4>
+                        <p style="color: rgba(224, 224, 224, 0.8); font-size: 14px; line-height: 1.6;">
+                            图像已由火山引擎 Seedream 模型生成。点击"保存到本地"按钮可下载图像。如果按钮无法保存，可以右键点击图像选择"另存为"。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 豆包网页端图像生成区域 -->
+            <div id="doubaoResultSection" class="result-section" style="display: none; margin-top: 20px;">
+                <div class="card result-card" style="border-top: 4px solid #4CAF50;">
+                    <h3>🌐 豆包图像生成</h3>
+
+                    <div class="result-block">
+                        <h4>📝 生成的提示词</h4>
+                        <div class="prompt-container">
+                            <div id="doubaoPrompt" class="result-content prompt"></div>
+                            <button class="copy-btn" onclick="copyText('doubaoPrompt')">复制</button>
+                        </div>
+                    </div>
+
+                    <div class="result-block">
+                        <h4>🌐 豆包网页端</h4>
+                        <a id="doubaoLink" href="" target="_blank" class="btn btn-primary" style="width: 100%; min-width: auto; text-decoration: none; display: flex; justify-content: center; align-items: center; gap: 8px;">
+                            <span>🚀</span> 前往豆包网页端
+                        </a>
+                    </div>
+
+                    <div class="result-block" style="border-bottom: none;">
+                        <h4>💡 使用说明</h4>
+                        <p style="color: rgba(224, 224, 224, 0.8); font-size: 14px; line-height: 1.6;">
+                            1. 点击"复制"按钮复制提示词<br>
+                            2. 点击"前往豆包网页端"按钮打开豆包<br>
+                            3. 在豆包中粘贴提示词并生成图像
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 消息区域 -->
+            <div id="message" class="message"></div>
+
+            <!-- 历史记录区域 -->
+            <div id="historySection" class="history-section" style="display: none;">
+                <div class="card history-card">
+                    <h3>📚 历史记录</h3>
+                    <div id="historyList"></div>
+                    <button class="clear-history-btn" onclick="clearHistory()">清除所有历史记录</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 说明区域 -->
+        <div class="info-section">
+            <div class="card">
+                <div class="info-content">
+                    <h4>💡 使用说明</h4>
+                    <p><strong>1. 输入想法：</strong>描述你想要的场景，越详细越好（如"森林里的精灵少女，穿着薄纱长裙，手持发光魔杖"）</p>
+                    <p><strong>2. 选择画风：</strong>（可选）在生成前选择你想要的画风，包括写实、动漫、插画、油画、水彩、素描、3D渲染、赛博朋克、古风、像素、卡通、水墨等</p>
+                    <p><strong>3. 生成提示词：</strong>点击"生成专业提示词"，系统会根据输入和选择的画风生成提示词</p>
+                    <p><strong>4. 查看多版本：</strong>复杂输入会生成5个不同风格的提示词版本（基础版、详细版、艺术版、技术版、创意版）</p>
+                    <p><strong>5. 选择工具：</strong>根据使用的AI工具，选择对应的格式（Stable Diffusion、Midjourney、DALL·E）</p>
+                    <p><strong>6. 复制使用：</strong>点击"复制"按钮，将提示词粘贴到AI绘画工具中使用</p>
+                    <p><strong>7. 历史记录：</strong>所有生成的提示词都会自动保存到 <code>prompt_history.txt</code> 文件中</p>
+                    <p><strong>8. 图像生成：</strong>两种生成方式可选：<br>
+                    - 🔥 <strong>火山引擎：</strong>直接调用API生成图像，支持下载保存<br>
+                    - 🌐 <strong>豆包网页端：</strong>复制提示词到豆包网页端生成图像</p>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>专业提示词生成系统 · 基于全网最佳实践 · 本地运行 · 保护隐私</p>
+        </footer>
+    </div>
+
+    <script>
+        // 全局变量
+        let history = [];
+        let isGenerating = false;
+        let currentTool = 'stable';
+        let currentPositive = '';
+        let currentNegative = '';
+        let isGeneratingImage = false;
+        let currentImageUrl = '';
+        let currentStyle = '';
+
+        // DOM元素
+        const userInput = document.getElementById('userInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const progressSection = document.getElementById('progressSection');
+        const progressMessage = document.getElementById('progressMessage');
+        const resultSection = document.getElementById('resultSection');
+        const positivePrompt = document.getElementById('positivePrompt');
+        const negativePrompt = document.getElementById('negativePrompt');
+        const sceneAnalysis = document.getElementById('sceneAnalysis');
+        const artStyle = document.getElementById('artStyle');
+        const lighting = document.getElementById('lighting');
+        const toolContent = document.getElementById('toolContent');
+        const message = document.getElementById('message');
+        const historySection = document.getElementById('historySection');
+        const historyList = document.getElementById('historyList');
+        const volcengineResultSection = document.getElementById('volcengineResultSection');
+        const doubaoResultSection = document.getElementById('doubaoResultSection');
+        const generateImageBtn = document.getElementById('generateImageBtn');
+        const openDoubaoBtn = document.getElementById('openDoubaoBtn');
+        const variantsSection = document.getElementById('variantsSection');
+
+        // 步骤元素
+        const steps = {
+            1: { circle: document.getElementById('step1'), label: document.getElementById('label1') },
+            2: { circle: document.getElementById('step2'), label: document.getElementById('label2') },
+            3: { circle: document.getElementById('step3'), label: document.getElementById('label3') },
+            4: { circle: document.getElementById('step4'), label: document.getElementById('label4') }
+        };
+
+        // 更新进度指示器
+        function updateProgress(step, message) {
+            // 重置所有步骤
+            Object.keys(steps).forEach(key => {
+                steps[key].circle.classList.remove('active', 'completed');
+                steps[key].label.classList.remove('active', 'completed');
+            });
+
+            // 更新当前步骤
+            if (step >= 1 && step <= 4) {
+                // 标记已完成的步骤
+                for (let i = 1; i < step; i++) {
+                    steps[i].circle.classList.add('completed');
+                    steps[i].label.classList.add('completed');
+                }
+
+                // 标记当前步骤
+                steps[step].circle.classList.add('active');
+                steps[step].label.classList.add('active');
+            }
+
+            // 更新消息
+            progressMessage.textContent = message;
+        }
+
+        // 显示进度指示器
+        function showProgress() {
+            progressSection.style.display = 'block';
+            updateProgress(1, '准备开始...');
+        }
+
+        // 隐藏进度指示器
+        function hideProgress() {
+            progressSection.style.display = 'none';
+        }
+
+        // 生成图像 - 支持火山引擎和豆包网页端
+        async function generateImage(mode) {
+            const prompt = currentPositive;
+
+            if (!prompt) {
+                showMessage('⚠️ 请先生成提示词！', 'error');
+                return;
+            }
+
+            if (isGeneratingImage) {
+                return;
+            }
+
+            isGeneratingImage = true;
+
+            if (mode === 'volcengine') {
+                // 火山引擎生成
+                generateImageBtn.disabled = true;
+                generateImageBtn.innerHTML = '<span>⏳</span> 生成中...';
+                openDoubaoBtn.disabled = true;
+                showMessage('正在调用火山引擎生成图像...', '');
+
+                try {
+                    const response = await fetch('/api/generate_image', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({prompt: prompt})
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+
+                    // 显示生成的图像
+                    const generatedImage = document.getElementById('generatedImage');
+                    const volcenginePrompt = document.getElementById('volcenginePrompt');
+
+                    if (data.image_url) {
+                        generatedImage.src = data.image_url;
+                        currentImageUrl = data.image_url;
+                        volcenginePrompt.textContent = prompt;
+                        volcengineResultSection.style.display = 'block';
+                        doubaoResultSection.style.display = 'none';
+                        volcengineResultSection.classList.add('fade-in');
+                        showMessage('✅ 图像生成成功！', 'success');
+                    } else {
+                        throw new Error('未能获取图像URL');
+                    }
+
+                } catch (error) {
+                    console.error('火山引擎图像生成错误:', error);
+                    showMessage('❌ 火山引擎错误: ' + error.message, 'error');
+                } finally {
+                    isGeneratingImage = false;
+                    generateImageBtn.disabled = false;
+                    generateImageBtn.innerHTML = '<span>🔥</span> 火山引擎生成图像';
+                    openDoubaoBtn.disabled = false;
+                }
+            } else if (mode === 'doubao') {
+                // 豆包网页端
+                openDoubaoBtn.disabled = true;
+                generateImageBtn.disabled = true;
+                openDoubaoBtn.innerHTML = '<span>⏳</span> 准备中...';
+                showMessage('正在准备豆包图像生成...', '');
+
+                try {
+                    const doubao_url = "https://www.doubao.com/chat/";
+                    const doubaoPrompt = document.getElementById('doubaoPrompt');
+                    const doubaoLink = document.getElementById('doubaoLink');
+
+                    doubaoPrompt.textContent = prompt;
+                    doubaoLink.href = doubao_url;
+                    doubaoResultSection.style.display = 'block';
+                    volcengineResultSection.style.display = 'none';
+                    doubaoResultSection.classList.add('fade-in');
+                    showMessage('✅ 已准备好！请复制提示词到豆包网页端', 'success');
+
+                } catch (error) {
+                    console.error('豆包图像生成错误:', error);
+                    showMessage('❌ 错误: ' + error.message, 'error');
+                } finally {
+                    isGeneratingImage = false;
+                    openDoubaoBtn.disabled = false;
+                    generateImageBtn.disabled = false;
+                    openDoubaoBtn.innerHTML = '<span>🌐</span> 豆包网页端生成';
+                }
+            }
+        }
+
+        // 保存图像
+        async function saveImage() {
+            if (!currentImageUrl) {
+                showMessage('⚠️ 没有可保存的图像', 'error');
+                return;
+            }
+
+            const saveImageBtn = document.getElementById('saveImageBtn');
+            saveImageBtn.disabled = true;
+            saveImageBtn.innerHTML = '<span>⏳</span> 下载中...';
+
+            try {
+                // 调用后端代理下载图片
+                const response = await fetch('/api/download_image', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({image_url: currentImageUrl})
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP错误: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // 将base64数据转换为blob并下载
+                fetch(data.image_data)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+
+                        // 生成文件名：image_时间戳.png
+                        const timestamp = new Date().getTime();
+                        a.download = `image_${timestamp}.png`;
+
+                        document.body.appendChild(a);
+                        a.click();
+
+                        // 清理
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+
+                        showMessage('✅ 图像已保存到本地', 'success');
+                    });
+
+            } catch (error) {
+                console.error('保存图像失败:', error);
+                showMessage('❌ 保存失败: ' + error.message, 'error');
+            } finally {
+                saveImageBtn.disabled = false;
+                saveImageBtn.innerHTML = '<span>⬇️</span> 保存到本地';
+            }
+        }
+
+        // 显示消息
+        function showMessage(text, type) {
+            message.textContent = text;
+            message.className = `message ${type}`;
+            message.style.display = 'block';
+
+            // 3秒后自动隐藏
+            setTimeout(() => {
+                message.style.display = 'none';
+            }, 3000);
+        }
+
+        // 选择画风
+        function selectStyle(element, style) {
+            // 更新全局变量
+            currentStyle = style;
+
+            // 更新UI样式
+            document.querySelectorAll('.style-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            element.classList.add('active');
+
+            // 显示选择反馈
+            if (style) {
+                showMessage(`✅ 已选择画风: ${style}`, 'success');
+            } else {
+                showMessage('✅ 已恢复默认画风', 'success');
+            }
+        }
+
+        // 设置加载状态
+        function setLoading(isLoading) {
+            isGenerating = isLoading;
+
+            if (isLoading) {
+                generateBtn.disabled = true;
+                generateBtn.innerHTML = '<span>⏳</span> 生成中...';
+                userInput.disabled = true;
+                clearBtn.disabled = true;
+                document.body.classList.add('loading');
+            } else {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '<span>🚀</span> 生成专业提示词';
+                userInput.disabled = false;
+                clearBtn.disabled = false;
+                document.body.classList.remove('loading');
+            }
+        }
+
+        // 切换工具标签
+        function switchTool(tool) {
+            currentTool = tool;
+
+            // 更新标签样式
+            document.querySelectorAll('.tool-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector(`[data-tool="${tool}"]`).classList.add('active');
+
+            // 更新内容
+            updateToolContent();
+        }
+
+        // 更新工具内容
+        function updateToolContent() {
+            if (!currentPositive) {
+                toolContent.textContent = '请先生成提示词';
+                return;
+            }
+
+            let content = '';
+
+            switch(currentTool) {
+                case 'stable':
+                    content = `正面提示词：${currentPositive}\n\n负面提示词：${currentNegative}`;
+                    break;
+                case 'midjourney':
+                    const midjourneyPrompt = currentPositive
+                        .replace(/, /g, ', ')
+                        .replace(/\.\s*/g, ', ')
+                        .trim();
+                    content = `${midjourneyPrompt}\n--ar 16:9 --v 6.0 --style raw`;
+                    break;
+                case 'dalle':
+                    content = currentPositive;
+                    break;
+            }
+
+            toolContent.textContent = content;
+        }
+
+        // 生成提示词
+        async function generatePrompt() {
+            const input = userInput.value.trim();
+
+            if (!input) {
+                showMessage('❌ 请输入内容！', 'error');
+                return;
+            }
+
+            if (isGenerating) {
+                return;
+            }
+
+            setLoading(true);
+            showProgress();
+            updateProgress(1, '准备调用专业AI...');
+            showMessage('', '');
+
+            try {
+                // 步骤2：调用AI
+                updateProgress(2, '正在分析场景并生成提示词...');
+
+                const requestBody = {
+                    input: input
+                };
+
+                // 如果选择了特定画风，添加到请求中
+                if (currentStyle) {
+                    requestBody.style = currentStyle;
+                }
+
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP错误: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // 步骤3：显示结果
+                updateProgress(3, '正在格式化结果...');
+
+                // 存储当前提示词
+                currentPositive = data.positive_prompt || '';
+                currentNegative = data.negative_prompt || '';
+
+                // 显示所有结果
+                positivePrompt.textContent = currentPositive;
+                negativePrompt.textContent = currentNegative;
+                sceneAnalysis.textContent = data.scene_analysis || '';
+                artStyle.textContent = data.art_style || '';
+                lighting.textContent = data.lighting || '';
+
+                // 处理变体
+                if (data.variants) {
+                    variantsSection.style.display = 'block';
+                    document.getElementById('variantBasic').textContent = data.variants.basic || '';
+                    document.getElementById('variantDetailed').textContent = data.variants.detailed || '';
+                    document.getElementById('variantArtistic').textContent = data.variants.artistic || '';
+                    document.getElementById('variantTechnical').textContent = data.variants.technical || '';
+                    document.getElementById('variantCreative').textContent = data.variants.creative || '';
+                } else {
+                    variantsSection.style.display = 'none';
+                }
+
+                // 更新工具内容
+                updateToolContent();
+
+                resultSection.style.display = 'block';
+                resultSection.classList.add('fade-in');
+
+                // 步骤4：保存记录
+                updateProgress(4, '正在保存记录...');
+
+                // 添加到历史记录
+                const historyItem = {
+                    input: input,
+                    positive: currentPositive,
+                    negative: currentNegative,
+                    scene_analysis: data.scene_analysis || '',
+                    art_style: data.art_style || '',
+                    lighting: data.lighting || '',
+                    variants: data.variants || null,
+                    complexity: data.complexity || 'medium',
+                    input_stats: data.input_stats || {},
+                    timestamp: new Date().toLocaleString()
+                };
+
+                history.unshift(historyItem);
+                updateHistoryDisplay();
+                await saveToFile(historyItem);
+
+                // 完成
+                updateProgress(5, '✅ 专业提示词生成完成！');
+
+                // 显示复杂度信息
+                if (data.input_stats) {
+                    const stats = data.input_stats;
+                    showMessage(`✅ 生成成功！复杂度: ${stats.complexity}，输入长度: ${stats.length}字符，词数: ${stats.word_count}`, 'success');
+                } else {
+                    showMessage('✅ 生成成功！', 'success');
+                }
+
+            } catch (error) {
+                console.error('错误:', error);
+                showMessage('❌ 错误: ' + error.message, 'error');
+                updateProgress(1, '准备开始...');
+            } finally {
+                setTimeout(() => {
+                    hideProgress();
+                    setLoading(false);
+                }, 1000);
+            }
+        }
+
+        // 更新历史记录显示
+        function updateHistoryDisplay() {
+            if (history.length === 0) {
+                historySection.style.display = 'none';
+                return;
+            }
+
+            historySection.style.display = 'block';
+            historyList.innerHTML = '';
+
+            history.forEach((item, index) => {
+                const historyItemDiv = document.createElement('div');
+                historyItemDiv.className = 'history-item fade-in';
+                historyItemDiv.innerHTML = `
+                    <div class="history-input">输入: ${item.input}</div>
+                    <div class="history-output">输出: ${item.positive}</div>
+                    <div class="history-meta">${item.timestamp}</div>
+                `;
+                historyList.appendChild(historyItemDiv);
+            });
+        }
+
+        // 保存到文件
+        async function saveToFile(historyItem) {
+            try {
+                const response = await fetch('/api/save_history', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(historyItem)
+                });
+
+                if (!response.ok) {
+                    throw new Error('保存失败');
+                }
+            } catch (error) {
+                console.error('保存失败:', error);
+            }
+        }
+
+        // 清空输入
+        function clearInput() {
+            userInput.value = '';
+            resultSection.style.display = 'none';
+            variantsSection.style.display = 'none';
+            currentPositive = '';
+            currentNegative = '';
+
+            // 重置画风选择
+            currentStyle = '';
+            document.querySelectorAll('.style-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector('.style-tab[data-style=""]').classList.add('active');
+
+            showMessage('✅ 已清空输入', 'success');
+            updateProgress(1, '准备开始...');
+        }
+
+        // 清空历史记录
+        function clearHistory() {
+            if (history.length === 0) {
+                showMessage('⚠️ 没有历史记录可清除', 'error');
+                return;
+            }
+
+            if (confirm('确定要清除所有历史记录吗？这将同时清除文件中的记录。')) {
+                history = [];
+                historySection.style.display = 'none';
+                historyList.innerHTML = '';
+
+                // 调用后端清除文件
+                fetch('/api/clear_history', { method: 'POST' })
+                    .then(() => showMessage('✅ 历史记录已清除', 'success'))
+                    .catch(() => showMessage('⚠️ 清除成功，但文件可能未更新', 'warning'));
+            }
+        }
+
+        // 复制文本
+        function copyText(elementId) {
+            const text = document.getElementById(elementId).textContent;
+
+            if (!text) {
+                showMessage('⚠️ 没有内容可复制', 'error');
+                return;
+            }
+
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    showMessage('✅ 已复制到剪贴板', 'success');
+                })
+                .catch(err => {
+                    showMessage('❌ 复制失败: ' + err, 'error');
+                });
+        }
+
+        // 事件监听
+        generateBtn.addEventListener('click', generatePrompt);
+        clearBtn.addEventListener('click', clearInput);
+
+        // 键盘快捷键
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                e.preventDefault();
+                generatePrompt();
+            }
+        });
+
+        // 页面加载时加载历史记录
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/api/load_history');
+                if (response.ok) {
+                    const data = await response.json();
+                    history = data.history || [];
+                    updateHistoryDisplay();
+                }
+            } catch (error) {
+                console.error('加载历史记录失败:', error);
+            }
+        });
+    </script>
+</body>
+</html>
