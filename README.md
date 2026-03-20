@@ -2,12 +2,17 @@
 
 <div align="center">
 
+![](social-preview.png)
+
 **基于全网最佳实践，为 Stable Diffusion、Midjourney 等 AI 绘画工具生成专业级提示词**
 
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Flask](https://img.shields.io/badge/Flask-2.3.3-green.svg)](https://flask.palletsprojects.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
+[![GitHub Stars](https://img.shields.io/github/stars/sakura-love/prompt-tool-PRO.svg?style=social)](https://github.com/sakura-love/prompt-tool-PRO/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/sakura-love/prompt-tool-PRO.svg)](https://github.com/sakura-love/prompt-tool-PRO/issues)
+[![GitHub Forks](https://img.shields.io/github/forks/sakura-love/prompt-tool-PRO.svg?style=social)](https://github.com/sakura-love/prompt-tool-PRO/network/members)
 
 [功能特性](#功能特性) • [快速开始](#快速开始) • [使用说明](#使用说明) • [技术架构](#技术架构) • [常见问题](#常见问题)
 
