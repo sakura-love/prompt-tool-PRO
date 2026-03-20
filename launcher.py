@@ -391,7 +391,7 @@ class ModernLauncherApp:
         # 版本信息
         version_label = tk.Label(
             main_container,
-            text="v1.4.0 | Windows 11 Edition",
+            text="v1.5.1 | Windows 11 Edition",
             bg=self.colors.BG_PRIMARY,
             fg=self.colors.TEXT_TERTIARY,
             font=self.font_version

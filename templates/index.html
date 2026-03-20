@@ -774,38 +774,6 @@
                         </div>
                     </div>
 
-                    <!-- 变体区域 -->
-                    <div id="variantsSection" class="result-block" style="display: none;">
-                        <h4>🎨 多版本提示词</h4>
-                        <div class="variants-container">
-                            <div class="variant-item">
-                                <h5>基础版</h5>
-                                <div id="variantBasic" class="result-content prompt"></div>
-                                <button class="copy-btn" onclick="copyText('variantBasic')">复制</button>
-                            </div>
-                            <div class="variant-item">
-                                <h5>详细版</h5>
-                                <div id="variantDetailed" class="result-content prompt"></div>
-                                <button class="copy-btn" onclick="copyText('variantDetailed')">复制</button>
-                            </div>
-                            <div class="variant-item">
-                                <h5>艺术版</h5>
-                                <div id="variantArtistic" class="result-content prompt"></div>
-                                <button class="copy-btn" onclick="copyText('variantArtistic')">复制</button>
-                            </div>
-                            <div class="variant-item">
-                                <h5>技术版</h5>
-                                <div id="variantTechnical" class="result-content prompt"></div>
-                                <button class="copy-btn" onclick="copyText('variantTechnical')">复制</button>
-                            </div>
-                            <div class="variant-item">
-                                <h5>创意版</h5>
-                                <div id="variantCreative" class="result-content prompt"></div>
-                                <button class="copy-btn" onclick="copyText('variantCreative')">复制</button>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- 详细分析 -->
                     <div class="result-block">
                         <h4>🔍 详细分析</h4>
@@ -952,11 +920,10 @@
                     <p><strong>1. 输入想法：</strong>描述你想要的场景，越详细越好（如"森林里的精灵少女，穿着薄纱长裙，手持发光魔杖"）</p>
                     <p><strong>2. 选择画风：</strong>（可选）在生成前选择你想要的画风，包括写实、动漫、插画、油画、水彩、素描、3D渲染、赛博朋克、古风、像素、卡通、水墨等</p>
                     <p><strong>3. 生成提示词：</strong>点击"生成专业提示词"，系统会根据输入和选择的画风生成提示词</p>
-                    <p><strong>4. 查看多版本：</strong>复杂输入会生成5个不同风格的提示词版本（基础版、详细版、艺术版、技术版、创意版）</p>
-                    <p><strong>5. 选择工具：</strong>根据使用的AI工具，选择对应的格式（Stable Diffusion、Midjourney、DALL·E）</p>
-                    <p><strong>6. 复制使用：</strong>点击"复制"按钮，将提示词粘贴到AI绘画工具中使用</p>
-                    <p><strong>7. 历史记录：</strong>所有生成的提示词都会自动保存到 <code>prompt_history.txt</code> 文件中</p>
-                    <p><strong>8. 图像生成：</strong>两种生成方式可选：<br>
+                    <p><strong>4. 选择工具：</strong>根据使用的AI工具，选择对应的格式（Stable Diffusion、Midjourney、DALL·E）</p>
+                    <p><strong>5. 复制使用：</strong>点击"复制"按钮，将提示词粘贴到AI绘画工具中使用</p>
+                    <p><strong>6. 历史记录：</strong>所有生成的提示词都会自动保存到 <code>prompt_history.txt</code> 文件中</p>
+                    <p><strong>7. 图像生成：</strong>两种生成方式可选：<br>
                     - 🔥 <strong>火山引擎：</strong>直接调用API生成图像，支持下载保存<br>
                     - 🌐 <strong>豆包网页端：</strong>复制提示词到豆包网页端生成图像</p>
                 </div>
@@ -999,7 +966,6 @@
         const doubaoResultSection = document.getElementById('doubaoResultSection');
         const generateImageBtn = document.getElementById('generateImageBtn');
         const openDoubaoBtn = document.getElementById('openDoubaoBtn');
-        const variantsSection = document.getElementById('variantsSection');
 
         // 步骤元素
         const steps = {
@@ -1354,18 +1320,6 @@
                 artStyle.textContent = data.art_style || '';
                 lighting.textContent = data.lighting || '';
 
-                // 处理变体
-                if (data.variants) {
-                    variantsSection.style.display = 'block';
-                    document.getElementById('variantBasic').textContent = data.variants.basic || '';
-                    document.getElementById('variantDetailed').textContent = data.variants.detailed || '';
-                    document.getElementById('variantArtistic').textContent = data.variants.artistic || '';
-                    document.getElementById('variantTechnical').textContent = data.variants.technical || '';
-                    document.getElementById('variantCreative').textContent = data.variants.creative || '';
-                } else {
-                    variantsSection.style.display = 'none';
-                }
-
                 // 更新工具内容
                 updateToolContent();
 
@@ -1383,7 +1337,6 @@
                     scene_analysis: data.scene_analysis || '',
                     art_style: data.art_style || '',
                     lighting: data.lighting || '',
-                    variants: data.variants || null,
                     complexity: data.complexity || 'medium',
                     input_stats: data.input_stats || {},
                     timestamp: new Date().toLocaleString()

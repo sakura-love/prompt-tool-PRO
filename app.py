@@ -41,156 +41,167 @@ def index():
 
 @app.route('/api/generate', methods=['POST'])
 def generate():
-    data = request.get_json()
-    user_input = data.get('input', '')
-    style = data.get('style', None)
+    try:
+        data = request.get_json()
+        print(f"接收到的请求数据: {data}")  # 调试
 
-    if not user_input:
-        return jsonify({"error": "请输入内容"}), 400
+        user_input = data.get('input', '')
+        style = data.get('style', None)
 
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
+        if not user_input:
+            return jsonify({"error": "请输入内容"}), 400
 
-    # 统一使用一套提示词生成逻辑
-    professional_prompt = generate_prompt(user_input, style)
-    max_tokens = 800
+        headers = {
+            "Authorization": f"Bearer {API_KEY}",
+            "Content-Type": "application/json"
+        }
 
-    payload = {
-        "model": "glm-4-flash",
-        "messages": [
-            {"role": "user", "content": professional_prompt}
-        ],
-        "temperature": 0.7,
-        "top_p": 0.9,
-        "max_tokens": max_tokens
-    }
+        # 统一使用一套提示词生成逻辑
+        professional_prompt = generate_prompt(user_input, style)
+        max_tokens = 800
 
-    # 增加重试机制
-    max_retries = 3
-    base_delay = 2
+        payload = {
+            "model": "glm-4-flash",
+            "messages": [
+                {"role": "user", "content": professional_prompt}
+            ],
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "max_tokens": max_tokens
+        }
 
-    for attempt in range(max_retries):
-        try:
-            print(f"调用API，尝试 {attempt + 1}/{max_retries}，输入: {user_input}")
+        # 增加重试机制
+        max_retries = 3
+        base_delay = 2
 
-            timeout = 30 + (attempt * 15)
+        for attempt in range(max_retries):
+            try:
+                print(f"调用API，尝试 {attempt + 1}/{max_retries}，输入: {user_input}")
 
-            response = requests.post(
-                API_URL,
-                json=payload,
-                headers=headers,
-                timeout=timeout
-            )
+                timeout = 30 + (attempt * 15)
 
-            print(f"API状态码: {response.status_code}")
+                response = requests.post(
+                    API_URL,
+                    json=payload,
+                    headers=headers,
+                    timeout=timeout
+                )
 
-            if response.status_code == 200:
-                result = response.json()
-                content = result["choices"][0]["message"]["content"]
-                print(f"API返回内容长度: {len(content)} 字符")  # 调试
+                print(f"API状态码: {response.status_code}")
 
-                # 解析逻辑...
-                try:
-                    # 清理可能的markdown代码块标记
-                    content = re.sub(r'```json\s*', '', content)
-                    content = re.sub(r'```\s*', '', content)
-                    content = content.strip()
+                if response.status_code == 200:
+                    result = response.json()
+                    content = result["choices"][0]["message"]["content"]
+                    print(f"API返回内容长度: {len(content)} 字符")  # 调试
 
-                    data = json.loads(content)
+                    # 解析逻辑...
+                    try:
+                        # 清理可能的markdown代码块标记
+                        content = re.sub(r'```json\s*', '', content)
+                        content = re.sub(r'```\s*', '', content)
+                        content = content.strip()
 
-                    # 提取关键字段
-                    positive = data.get("positive_prompt", "")
-                    negative = data.get("negative_prompt", "")
-                    analysis = data.get("scene_analysis", "")
+                        print(f"清理后的内容: {content[:200]}...")  # 打印前200个字符用于调试
 
-                    # 如果字段缺失，尝试从其他字段补充
-                    if not positive and "positive" in data:
-                        positive = data["positive"]
-                    if not negative and "negative" in data:
-                        negative = data["negative"]
+                        data = json.loads(content)
 
-                    # 确保有基础内容
-                    if not positive:
-                        positive = f"masterpiece, best quality, 8k, ultra detailed, {user_input}"
-                    if not negative:
-                        negative = "low quality, blurry, bad anatomy, deformed, watermark, text, ugly"
+                        print(f"JSON解析成功，字段: {list(data.keys())}")  # 打印JSON字段
 
-                    # 提取其他有用信息
-                    art_style = data.get("art_style", "")
-                    lighting = data.get("lighting", "")
-                    composition = data.get("composition", "")
-                    technical_notes = data.get("technical_notes", "")
+                        # 提取关键字段
+                        positive = data.get("positive_prompt", "")
+                        negative = data.get("negative_prompt", "")
+                        analysis = data.get("scene_analysis", "")
 
-                    # 生成多个变体
-                    variants = generate_variants(positive, user_input)
-                    data["variants"] = variants
+                        # 如果字段缺失，尝试从其他字段补充
+                        if not positive and "positive" in data:
+                            positive = data["positive"]
+                        if not negative and "negative" in data:
+                            negative = data["negative"]
 
-                    response_data = {
-                        "positive_prompt": positive,
-                        "negative_prompt": negative,
-                        "scene_analysis": analysis,
-                        "art_style": art_style,
-                        "lighting": lighting,
-                        "composition": composition,
-                        "technical_notes": technical_notes
-                    }
+                        # 确保有基础内容
+                        if not positive:
+                            positive = f"masterpiece, best quality, 8k, ultra detailed, {user_input}"
+                        if not negative:
+                            negative = "low quality, blurry, bad anatomy, deformed, watermark, text, ugly"
 
-                    # 如果有变体，添加到响应中
-                    if "variants" in data:
-                        response_data["variants"] = data["variants"]
+                        # 提取其他有用信息
+                        art_style = data.get("art_style", "")
+                        lighting = data.get("lighting", "")
+                        composition = data.get("composition", "")
+                        technical_notes = data.get("technical_notes", "")
 
-                    print(f"解析成功 - 正向提示词长度: {len(positive)}")  # 调试
+                        response_data = {
+                            "positive_prompt": positive,
+                            "negative_prompt": negative,
+                            "scene_analysis": analysis,
+                            "art_style": art_style,
+                            "lighting": lighting,
+                            "composition": composition,
+                            "technical_notes": technical_notes
+                        }
 
-                    return jsonify(response_data)
+                        print(f"解析成功 - 正向提示词长度: {len(positive)}")  # 调试
 
-                except json.JSONDecodeError:
-                    print(f"JSON解析失败，尝试文本解析")  # 调试
-                    return parse_text_response(content, user_input)
+                        return jsonify(response_data)
 
-            elif response.status_code == 429:
-                wait_time = (attempt + 1) * 5
-                print(f"速率限制，等待 {wait_time} 秒...")
-                time.sleep(wait_time)
-                continue
+                    except json.JSONDecodeError as e:
+                        print(f"JSON解析失败: {str(e)}")  # 调试
+                        print(f"原始内容: {content}")  # 打印原始内容
+                        return parse_text_response(content, user_input)
+                    except Exception as e:
+                        print(f"解析过程中发生错误: {str(e)}")  # 调试
+                        import traceback
+                        traceback.print_exc()
+                        return parse_text_response(content, user_input)
 
-            else:
-                error_msg = f"API错误: {response.status_code}"
-                print(f"API调用失败: {error_msg}, 响应内容: {response.text}")
-                try:
-                    error_detail = response.json()
-                    print(f"详细错误信息: {error_detail}")
-                    if 'error' in error_detail:
-                        return jsonify({"error": f"{error_msg} - {error_detail['error']}"}), 500
-                except:
-                    pass
-                return jsonify({"error": error_msg}), 500
+                elif response.status_code == 429:
+                    wait_time = (attempt + 1) * 5
+                    print(f"速率限制，等待 {wait_time} 秒...")
+                    time.sleep(wait_time)
+                    continue
 
-        except requests.exceptions.Timeout:
-            wait_time = (attempt + 1) * base_delay
-            print(f"请求超时，等待 {wait_time} 秒后重试...")
-            time.sleep(wait_time)
-            continue
+                else:
+                    error_msg = f"API错误: {response.status_code}"
+                    print(f"API调用失败: {error_msg}, 响应内容: {response.text}")
+                    try:
+                        error_detail = response.json()
+                        print(f"详细错误信息: {error_detail}")
+                        if 'error' in error_detail:
+                            return jsonify({"error": f"{error_msg} - {error_detail['error']}"}), 500
+                    except:
+                        pass
+                    return jsonify({"error": error_msg}), 500
 
-        except requests.exceptions.ConnectionError as e:
-            wait_time = (attempt + 1) * base_delay
-            print(f"连接错误: {str(e)}，等待 {wait_time} 秒后重试...")
-            time.sleep(wait_time)
-            continue
-
-        except Exception as e:
-            if attempt < max_retries - 1:
+            except requests.exceptions.Timeout:
                 wait_time = (attempt + 1) * base_delay
-                print(f"未知错误: {str(e)}，等待 {wait_time} 秒后重试...")
+                print(f"请求超时，等待 {wait_time} 秒后重试...")
                 time.sleep(wait_time)
                 continue
-            else:
-                print(f"最终错误: {str(e)}")
-                return jsonify({"error": f"请求失败: {str(e)}"}), 500
 
-    # 所有重试都失败
-    return jsonify({"error": "API请求失败，请稍后再试或检查网络连接"}), 500
+            except requests.exceptions.ConnectionError as e:
+                wait_time = (attempt + 1) * base_delay
+                print(f"连接错误: {str(e)}，等待 {wait_time} 秒后重试...")
+                time.sleep(wait_time)
+                continue
+
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * base_delay
+                    print(f"未知错误: {str(e)}，等待 {wait_time} 秒后重试...")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    print(f"最终错误: {str(e)}")
+                    return jsonify({"error": f"请求失败: {str(e)}"}), 500
+
+        # 所有重试都失败
+        return jsonify({"error": "API请求失败，请稍后再试或检查网络连接"}), 500
+
+    except Exception as e:
+        print(f"generate函数发生未捕获的异常: {str(e)}")  # 调试
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"服务器内部错误: {str(e)}"}), 500
 
 def generate_prompt(user_input, style=None):
     """生成统一的提示词"""
@@ -243,7 +254,7 @@ def generate_prompt(user_input, style=None):
 请以JSON格式返回，包含以下字段：
 {{
     "positive_prompt": "英文正向提示词（详细版）",
-    "negative_prompt": "英文负向提示词（排除所有不想要的元素）",
+    "negative_prompt": "英文负向提示词（严格使用以下标准模板，不得添加其他内容）：low quality, worst quality, blurry, bad anatomy, deformed, distorted, disfigured, bad proportions, extra limbs, missing limbs, floating limbs, disconnected limbs, mutation, mutated, ugly, disgusting, amputation, watermark, text, signature, logo, username, artist name, crop, cropped, out of frame, cut off, tiling, poorly drawn feet, poorly drawn face, out of focus, long neck, extra fingers, fewer fingers, bad hands, missing fingers, fused fingers, too many fingers, extra arms, extra legs, extra hands, malformed limbs, bad perspective, warped, error, jpeg artifacts, lowres, monochrome, grayscale",
     "scene_analysis": "详细的场景分析和建议",
     "art_style": "艺术风格建议",
     "lighting": "光照效果建议",
@@ -261,35 +272,6 @@ def generate_prompt(user_input, style=None):
 6. 生成详细且全面的提示词
 {"7. 必须严格按照用户选择的画风生成提示词" if style else "7. 选择最适合的绘画风格"}
 """
-
-def generate_variants(positive_prompt, user_input):
-    """根据基础prompt生成多个变体"""
-    variants = {
-        "basic": positive_prompt,
-        "detailed": positive_prompt,
-        "artistic": positive_prompt,
-        "technical": positive_prompt,
-        "creative": positive_prompt
-    }
-
-    # 根据用户输入添加额外元素
-    if "精灵" in user_input or "fairy" in user_input.lower():
-        variants["artistic"] += ", ethereal, magical, fantasy art, digital painting"
-        variants["creative"] += ", surreal, dreamlike, otherworldly, magical atmosphere"
-
-    if "赛博朋克" in user_input or "cyberpunk" in user_input.lower():
-        variants["technical"] += ", neon lights, futuristic, dystopian, high contrast"
-        variants["creative"] += ", holographic, cybernetic, augmented reality, glitch effects"
-
-    if "森林" in user_input or "forest" in user_input.lower():
-        variants["detailed"] += ", ancient trees, moss, ferns, dappled sunlight, mist"
-        variants["artistic"] += ", impressionist, nature painting, organic textures"
-
-    # 添加质量修饰词
-    for key in variants:
-        variants[key] += ", masterpiece, best quality, 8k"
-
-    return variants
 
 def parse_text_response(content, user_input):
     """最激进的解析 - 提取所有可能的提示词内容"""
@@ -332,9 +314,6 @@ def parse_text_response(content, user_input):
     else:
         analysis = f"用户输入: {user_input}"
 
-    # 生成变体
-    variants = generate_variants(positive, user_input)
-
     response_data = {
         "positive_prompt": positive,
         "negative_prompt": negative,
@@ -344,9 +323,6 @@ def parse_text_response(content, user_input):
         "composition": "",
         "technical_notes": ""
     }
-
-    if variants:
-        response_data["variants"] = variants
 
     print(f"激进解析完成 - 正向提示词长度: {len(positive)}")  # 调试
 
@@ -487,12 +463,7 @@ def save_history():
 技术备注: {data.get('technical_notes', '')}
 {'-'*60}
 """
-        # 如果有变体，也保存
-        if 'variants' in data:
-            record += "变体提示词:\n"
-            for variant_name, variant_text in data['variants'].items():
-                record += f"  {variant_name}: {variant_text}\n"
-            record += f"{'-'*60}\n"
+
 
         # 追加到文件
         with open(str(HISTORY_FILE), 'a', encoding='utf-8') as f:
@@ -564,7 +535,10 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     """处理500错误"""
-    return jsonify({"error": "500 - 服务器内部错误"}), 500
+    print(f"500错误详情: {str(error)}")  # 打印详细错误信息
+    import traceback
+    traceback.print_exc()  # 打印完整的错误堆栈
+    return jsonify({"error": f"500 - 服务器内部错误: {str(error)}"}), 500
 
 if __name__ == '__main__':
     # 检查API Key是否设置
