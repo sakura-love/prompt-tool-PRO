@@ -90,14 +90,14 @@ python launcher.py
 
 #### 智谱 AI API Key（必需）
 1. 访问 [https://open.bigmodel.cn/](https://open.bigmodel.cn/)
-2. 注册/登录账号
+2. 注册/登录账号后完成实名认证
 3. 进入控制台
 4. 创建 API Key
 5. 复制 API Key
 
 #### 火山引擎 API Key（可选）
 1. 访问 [https://console.volcengine.com/](https://console.volcengine.com/)
-2. 注册/登录账号
+2. 注册/登录账号后完成实名认证
 3. 进入 AI 开放平台
 4. 创建 API Key
 5. 复制 API Key
@@ -127,7 +127,7 @@ python launcher.py
    - 粘贴到 AI 绘画工具中使用
 
 4. **生成图像**
-   - **火山引擎**：点击"火山引擎生成图像"按钮，等待图像生成
+   - **火山引擎**：点击"火山引擎生成图像"按钮，等待图像生成，免费额度200次
    - **豆包网页端**：点击"豆包网页端生成"按钮，跳转到豆包平台
 
 ### 支持的画风
