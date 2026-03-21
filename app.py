@@ -61,7 +61,7 @@ def generate():
         max_tokens = 800
 
         payload = {
-            "model": "glm-4-flash",
+            "model": "glm-4-7-flash",
             "messages": [
                 {"role": "user", "content": professional_prompt}
             ],
