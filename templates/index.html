@@ -617,6 +617,60 @@
             background: linear-gradient(135deg, #8a95b1 0%, #667eea 100%);
         }
 
+        /* Windows 11 风格加载动画 */
+        .win11-loader {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .win11-loader.active {
+            display: flex;
+        }
+
+        .win11-spinner {
+            width: 40px;
+            height: 40px;
+            position: relative;
+        }
+
+        .win11-spinner::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            border-top-color: #0078D4;
+            animation: win11-spin 1s linear infinite;
+        }
+
+        .win11-spinner::after {
+            content: '';
+            position: absolute;
+            width: 70%;
+            height: 70%;
+            top: 15%;
+            left: 15%;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            border-top-color: #0078D4;
+            animation: win11-spin 1.5s linear infinite reverse;
+        }
+
+        @keyframes win11-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .win11-loading-text {
+            margin-left: 15px;
+            color: #e0e0e0;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
         /* 滚动条样式 */
         ::-webkit-scrollbar {
             width: 8px;
@@ -716,6 +770,10 @@
             <!-- 进度指示器 -->
             <div id="progressSection" class="progress-section">
                 <div class="progress-container">
+                    <div class="win11-loader" id="win11Loader">
+                        <div class="win11-spinner"></div>
+                        <div class="win11-loading-text" id="win11LoadingText">正在生成提示词...</div>
+                    </div>
                     <div class="progress-steps">
                         <div class="progress-step">
                             <div class="step-circle" id="step1">1</div>
@@ -741,7 +799,7 @@
             <!-- 结果区域 -->
             <div id="resultSection" class="result-section" style="display: none;">
                 <div class="card result-card">
-                    <h3>✨ 专业生成结果</h3>
+                    <h3>✨ 生成结果</h3>
 
                     <!-- 正向提示词 -->
                     <div class="result-block">
@@ -772,24 +830,6 @@
                             </div>
                             <div id="toolContent" class="tool-content"></div>
                         </div>
-                    </div>
-
-                    <!-- 详细分析 -->
-                    <div class="result-block">
-                        <h4>🔍 详细分析</h4>
-                        <div id="sceneAnalysis" class="result-content"></div>
-                    </div>
-
-                    <!-- 艺术风格 -->
-                    <div class="result-block">
-                        <h4>🎨 艺术风格</h4>
-                        <div id="artStyle" class="result-content"></div>
-                    </div>
-
-                    <!-- 光照效果 -->
-                    <div class="result-block">
-                        <h4>💡 光照效果</h4>
-                        <div id="lighting" class="result-content"></div>
                     </div>
 
 
@@ -955,9 +995,6 @@
         const resultSection = document.getElementById('resultSection');
         const positivePrompt = document.getElementById('positivePrompt');
         const negativePrompt = document.getElementById('negativePrompt');
-        const sceneAnalysis = document.getElementById('sceneAnalysis');
-        const artStyle = document.getElementById('artStyle');
-        const lighting = document.getElementById('lighting');
         const toolContent = document.getElementById('toolContent');
         const message = document.getElementById('message');
         const historySection = document.getElementById('historySection');
@@ -966,6 +1003,8 @@
         const doubaoResultSection = document.getElementById('doubaoResultSection');
         const generateImageBtn = document.getElementById('generateImageBtn');
         const openDoubaoBtn = document.getElementById('openDoubaoBtn');
+        const win11Loader = document.getElementById('win11Loader');
+        const win11LoadingText = document.getElementById('win11LoadingText');
 
         // 步骤元素
         const steps = {
@@ -1004,11 +1043,14 @@
         function showProgress() {
             progressSection.style.display = 'block';
             updateProgress(1, '准备开始...');
+            win11Loader.classList.add('active');
+            win11LoadingText.textContent = '正在生成提示词...';
         }
 
         // 隐藏进度指示器
         function hideProgress() {
             progressSection.style.display = 'none';
+            win11Loader.classList.remove('active');
         }
 
         // 生成图像 - 支持火山引擎和豆包网页端
@@ -1280,6 +1322,7 @@
             try {
                 // 步骤2：调用AI
                 updateProgress(2, '正在分析场景并生成提示词...');
+                win11LoadingText.textContent = '正在分析场景...';
 
                 const requestBody = {
                     input: input
@@ -1308,6 +1351,7 @@
 
                 // 步骤3：显示结果
                 updateProgress(3, '正在格式化结果...');
+                win11LoadingText.textContent = '正在格式化结果...';
 
                 // 存储当前提示词
                 currentPositive = data.positive_prompt || '';
@@ -1316,9 +1360,6 @@
                 // 显示所有结果
                 positivePrompt.textContent = currentPositive;
                 negativePrompt.textContent = currentNegative;
-                sceneAnalysis.textContent = data.scene_analysis || '';
-                artStyle.textContent = data.art_style || '';
-                lighting.textContent = data.lighting || '';
 
                 // 更新工具内容
                 updateToolContent();
@@ -1328,6 +1369,7 @@
 
                 // 步骤4：保存记录
                 updateProgress(4, '正在保存记录...');
+                win11LoadingText.textContent = '正在保存记录...';
 
                 // 添加到历史记录
                 const historyItem = {
@@ -1347,7 +1389,7 @@
                 await saveToFile(historyItem);
 
                 // 完成
-                updateProgress(5, '✅ 专业提示词生成完成！');
+                updateProgress(4, '✅ 专业提示词生成完成！');
 
                 // 显示复杂度信息
                 if (data.input_stats) {
@@ -1387,6 +1429,29 @@
                     <div class="history-output">输出: ${item.positive}</div>
                     <div class="history-meta">${item.timestamp}</div>
                 `;
+
+                // 点击历史记录恢复该结果
+                historyItemDiv.style.cursor = 'pointer';
+                historyItemDiv.title = '点击恢复该历史生成结果';
+                historyItemDiv.addEventListener('click', () => {
+                    userInput.value = item.input;
+                    currentPositive = item.positive;
+                    currentNegative = item.negative;
+
+                    positivePrompt.textContent = item.positive;
+                    negativePrompt.textContent = item.negative;
+
+                    // 影像结果区域隐藏（只恢复提示词预览界面）
+                    volcengineResultSection.style.display = 'none';
+                    doubaoResultSection.style.display = 'none';
+
+                    resultSection.style.display = 'block';
+                    resultSection.classList.add('fade-in');
+
+                    updateToolContent();
+                    showMessage('✅ 已恢复历史记录内容', 'success');
+                });
+
                 historyList.appendChild(historyItemDiv);
             });
         }
@@ -1412,9 +1477,15 @@
         function clearInput() {
             userInput.value = '';
             resultSection.style.display = 'none';
-            variantsSection.style.display = 'none';
+            volcengineResultSection.style.display = 'none';
+            doubaoResultSection.style.display = 'none';
             currentPositive = '';
             currentNegative = '';
+
+            // 重置结果显示字段
+            positivePrompt.textContent = '';
+            negativePrompt.textContent = '';
+            toolContent.textContent = '请先生成提示词';
 
             // 重置画风选择
             currentStyle = '';
@@ -1423,7 +1494,7 @@
             });
             document.querySelector('.style-tab[data-style=""]').classList.add('active');
 
-            showMessage('✅ 已清空输入', 'success');
+            showMessage('✅ 已清空输入并恢复默认界面', 'success');
             updateProgress(1, '准备开始...');
         }
 

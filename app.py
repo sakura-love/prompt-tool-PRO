@@ -3,11 +3,13 @@ from flask import Flask, render_template, request, jsonify
 import requests
 import json
 import os
-import re
 import time
 from datetime import datetime
 from pathlib import Path
 import sys
+from typing import Optional
+import logging
+from typing import Optional
 
 # 确定运行路径（打包或开发环境）
 if getattr(sys, 'frozen', False):
@@ -15,12 +17,27 @@ if getattr(sys, 'frozen', False):
     BASE_DIR = Path(sys._MEIPASS)
     # 可写目录（用于历史记录）
     WORK_DIR = Path(sys.executable).parent
+    print(f"打包环境: BASE_DIR={BASE_DIR}, WORK_DIR={WORK_DIR}")
 else:
     # 开发环境
     BASE_DIR = Path(__file__).parent
     WORK_DIR = BASE_DIR
+    print(f"开发环境: BASE_DIR={BASE_DIR}, WORK_DIR={WORK_DIR}")
 
-app = Flask(__name__, template_folder=str(BASE_DIR / 'templates'), static_folder=str(BASE_DIR / 'static'))
+# 确保模板和静态文件夹存在
+template_folder = BASE_DIR / 'templates'
+static_folder = BASE_DIR / 'static'
+
+if not template_folder.exists():
+    print(f"警告: 模板文件夹不存在: {template_folder}")
+if not static_folder.exists():
+    print(f"警告: 静态文件夹不存在: {static_folder}")
+
+app = Flask(__name__, template_folder=str(template_folder), static_folder=str(static_folder))
+
+# 配置日志
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # 配置：用户需自行填写API Key
 API_KEY = os.getenv('API_KEY', '')  # 通过启动器设置API Key
@@ -28,31 +45,94 @@ API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 
 # 火山引擎配置
 VOLC_API_KEY = os.getenv('VOLC_API_KEY', '')  # 通过启动器设置火山引擎API Key
-VOLC_IMAGE_API_URL = "https://ark.cn-beijing.volces.com/api/v3/images/generations"
-VOLC_IMAGE_MODEL = "doubao-seedream-4-5-251128"  # 图像生成模型
+VOLC_ENDPOINT = os.getenv('VOLC_ENDPOINT', '')  # 火山引擎推理接入点ID
+
+# 优先从配置文件读取火山引擎配置
+try:
+    volc_config_file = WORK_DIR / "launcher_config.json"
+    if volc_config_file.exists():
+        with open(volc_config_file, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+            if config.get('volc_api_key'):
+                VOLC_API_KEY = config.get('volc_api_key')
+                print(f"从配置文件读取VOLC_API_KEY: {VOLC_API_KEY[:20]}...{VOLC_API_KEY[-10:]}")
+            if config.get('volc_endpoint'):
+                VOLC_ENDPOINT = config.get('volc_endpoint')
+                print(f"从配置文件读取VOLC_ENDPOINT: {VOLC_ENDPOINT}")
+            else:
+                print("警告: 配置文件中未找到volc_endpoint，图像生成可能失败")
+except Exception as e:
+    print(f"读取火山引擎配置失败: {e}")
+
+# 火山引擎图像生成API端点
+# 使用推理接入点的完整URL格式
+# 图像生成模型需要使用推理接入点的基础URL + /completions
+VOLC_ENDPOINT_BASE = "https://ark.cn-beijing.volces.com"
+VOLC_ENDPOINT_ID = VOLC_ENDPOINT  # 推理接入点ID
+VOLC_DEFAULT_IMAGE_MODEL = "doubao-seedream-4-5-251128"  # 默认图像生成模型（如果未配置推理接入点）
+
 
 # 历史记录文件路径（放在可写目录）
 HISTORY_FILE = WORK_DIR / "prompt_history.txt"
 
+def get_api_key():
+    """获取API Key"""
+    return os.getenv('API_KEY', '')
+
+def get_volc_api_key():
+    """获取火山引擎API Key（动态读取，支持环境变量和配置文件）"""
+    # 先从环境变量读取
+    volc_api_key = os.getenv('VOLC_API_KEY', '')
+
+    # 如果环境变量为空，尝试从配置文件读取
+    if not volc_api_key:
+        try:
+            volc_config_file = WORK_DIR / "launcher_config.json"
+            if volc_config_file.exists():
+                with open(volc_config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    volc_api_key = config.get('volc_api_key', '')
+        except Exception as e:
+            print(f"从配置文件读取火山引擎API Key失败: {e}")
+
+    return volc_api_key
+
+
 # 路由定义
 @app.route('/')
 def index():
-    return render_template('index.html')
+    try:
+        logger.info("正在加载首页...")
+        template_path = template_folder / 'index.html'
+        logger.info(f"模板路径: {template_path}")
+        logger.info(f"模板存在: {template_path.exists()}")
+        return render_template('index.html')
+    except Exception as e:
+        logger.error(f"加载首页失败: {str(e)}")
+        return f"加载首页失败: {str(e)}", 500
 
 @app.route('/api/generate', methods=['POST'])
 def generate():
     try:
         data = request.get_json()
-        print(f"接收到的请求数据: {data}")  # 调试
+        logger.info(f"接收到的请求数据: {data}")
 
         user_input = data.get('input', '')
         style = data.get('style', None)
 
-        if not user_input:
+        if not user_input or len(user_input.strip()) == 0:
             return jsonify({"error": "请输入内容"}), 400
 
+        if len(user_input) > 10000:  # 限制输入长度
+            return jsonify({"error": "输入内容过长，请控制在10000字符以内"}), 400
+
+        # 动态获取API Key
+        api_key = get_api_key()
+        if not api_key:
+            return jsonify({"error": "请先配置API Key"}), 401
+
         headers = {
-            "Authorization": f"Bearer {API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
 
@@ -61,10 +141,13 @@ def generate():
         max_tokens = 800
 
         payload = {
-            "model": "glm-4-7-flash",
+            "model": "glm-4.7-flash",
             "messages": [
                 {"role": "user", "content": professional_prompt}
             ],
+            "thinking": {
+                "type": "disabled"
+            },
             "temperature": 0.7,
             "top_p": 0.9,
             "max_tokens": max_tokens
@@ -76,7 +159,7 @@ def generate():
 
         for attempt in range(max_retries):
             try:
-                print(f"调用API，尝试 {attempt + 1}/{max_retries}，输入: {user_input}")
+                logger.info(f"调用API，尝试 {attempt + 1}/{max_retries}，输入: {user_input}")
 
                 timeout = 30 + (attempt * 15)
 
@@ -87,78 +170,66 @@ def generate():
                     timeout=timeout
                 )
 
-                print(f"API状态码: {response.status_code}")
+                logger.info(f"API状态码: {response.status_code}")
 
                 if response.status_code == 200:
                     result = response.json()
-                    content = result["choices"][0]["message"]["content"]
-                    print(f"API返回内容长度: {len(content)} 字符")  # 调试
 
-                    # 解析逻辑...
-                    try:
-                        # 清理可能的markdown代码块标记
-                        content = re.sub(r'```json\s*', '', content)
-                        content = re.sub(r'```\s*', '', content)
-                        content = content.strip()
+                    # 检查响应结构
+                    logger.info(f"API响应结构: {list(result.keys())}")
+                    logger.info(f"完整API响应: {json.dumps(result, ensure_ascii=False)}")
 
-                        print(f"清理后的内容: {content[:200]}...")  # 打印前200个字符用于调试
+                    # 提取content
+                    if "choices" in result and len(result["choices"]) > 0:
+                        choice = result["choices"][0]
+                        logger.info(f"第一个choice的结构: {list(choice.keys())}")
+                        if "message" in choice:
+                            message = choice["message"]
+                            logger.info(f"message的结构: {list(message.keys())}")
+                            logger.info(f"message的完整内容: {json.dumps(message, ensure_ascii=False)}")
 
-                        data = json.loads(content)
+                            # 优先尝试content字段
+                            content = message.get("content", "")
 
-                        print(f"JSON解析成功，字段: {list(data.keys())}")  # 打印JSON字段
+                            # 如果content为空,尝试reasoning_content字段
+                            if not content or len(content.strip()) == 0:
+                                content = message.get("reasoning_content", "")
+                                logger.info(f"使用reasoning_content, 长度: {len(content)}")
+                        else:
+                            content = ""
+                    else:
+                        logger.error(f"API响应缺少choices字段: {result}")
+                        raise ValueError("API响应格式异常")
 
-                        # 提取关键字段
-                        positive = data.get("positive_prompt", "")
-                        negative = data.get("negative_prompt", "")
-                        analysis = data.get("scene_analysis", "")
+                    logger.info(f"API返回content长度: {len(content)} 字符")
 
-                        # 如果字段缺失，尝试从其他字段补充
-                        if not positive and "positive" in data:
-                            positive = data["positive"]
-                        if not negative and "negative" in data:
-                            negative = data["negative"]
+                    # 如果内容为空，尝试其他字段
+                    if not content:
+                        logger.warning("API返回内容为空，尝试其他字段")
+                        # 检查是否有thinking字段
+                        if "thinking" in result.get("choices", [{}])[0].get("message", {}):
+                            thinking = result["choices"][0]["message"].get("thinking", "")
+                            logger.info(f"Thinking内容长度: {len(thinking)} 字符")
 
-                        # 确保有基础内容
-                        if not positive:
-                            positive = f"masterpiece, best quality, 8k, ultra detailed, {user_input}"
-                        if not negative:
-                            negative = "low quality, blurry, bad anatomy, deformed, watermark, text, ugly"
+                    # 如果还是空的，返回默认提示词
+                    if not content or len(content.strip()) < 10:
+                        logger.warning("API返回内容不足，使用默认提示词")
+                        # 使用用户输入生成简单提示词
+                        content = f"【英文正向提示词】\nmasterpiece, best quality, 8k, ultra detailed, {user_input}\n\n【英文负向提示词】\nlow quality, worst quality, blurry, bad anatomy, deformed, watermark, text"
 
-                        # 提取其他有用信息
-                        art_style = data.get("art_style", "")
-                        lighting = data.get("lighting", "")
-                        composition = data.get("composition", "")
-                        technical_notes = data.get("technical_notes", "")
-
-                        response_data = {
-                            "positive_prompt": positive,
-                            "negative_prompt": negative,
-                            "scene_analysis": analysis,
-                            "art_style": art_style,
-                            "lighting": lighting,
-                            "composition": composition,
-                            "technical_notes": technical_notes
-                        }
-
-                        print(f"解析成功 - 正向提示词长度: {len(positive)}")  # 调试
-
-                        return jsonify(response_data)
-
-                    except json.JSONDecodeError as e:
-                        print(f"JSON解析失败: {str(e)}")  # 调试
-                        print(f"原始内容: {content}")  # 打印原始内容
-                        return parse_text_response(content, user_input)
-                    except Exception as e:
-                        print(f"解析过程中发生错误: {str(e)}")  # 调试
-                        import traceback
-                        traceback.print_exc()
-                        return parse_text_response(content, user_input)
+                    # 直接使用文本解析（API返回两行文本格式）
+                    return parse_text_response(content, user_input)
 
                 elif response.status_code == 429:
                     wait_time = (attempt + 1) * 5
                     print(f"速率限制，等待 {wait_time} 秒...")
                     time.sleep(wait_time)
                     continue
+
+                elif response.status_code == 401:
+                    error_msg = "API Key 无效或已过期"
+                    print(f"API Key验证失败")
+                    return jsonify({"error": error_msg}), 401
 
                 else:
                     error_msg = f"API错误: {response.status_code}"
@@ -167,10 +238,10 @@ def generate():
                         error_detail = response.json()
                         print(f"详细错误信息: {error_detail}")
                         if 'error' in error_detail:
-                            return jsonify({"error": f"{error_msg} - {error_detail['error']}"}), 500
+                            return jsonify({"error": f"{error_msg} - {error_detail['error']}"}), 400
                     except:
                         pass
-                    return jsonify({"error": error_msg}), 500
+                    return jsonify({"error": error_msg}), 400
 
             except requests.exceptions.Timeout:
                 wait_time = (attempt + 1) * base_delay
@@ -203,8 +274,8 @@ def generate():
         traceback.print_exc()
         return jsonify({"error": f"服务器内部错误: {str(e)}"}), 500
 
-def generate_prompt(user_input, style=None):
-    """生成统一的提示词"""
+def generate_prompt(user_input: str, style: Optional[str] = None) -> str:
+    """生成统一的提示词 - 直接返回简单格式"""
     # 定义主流画风及其对应的提示词
     style_prompts = {
         "写实": "photorealistic, hyperrealistic, 8k, ultra detailed, realistic photography, sharp focus, high resolution, professional photography, natural lighting",
@@ -222,109 +293,87 @@ def generate_prompt(user_input, style=None):
     }
 
     # 如果用户选择了特定画风，添加到提示词中
-    style_instruction = ""
+    style_tags = ""
     if style and style in style_prompts:
-        style_instruction = f"""
+        style_tags = f", {style_prompts[style]}"
 
-【重要要求】
-用户选择了特定的画风：{style}
-在正向提示词中必须包含以下画风关键词：{style_prompts[style]}
-确保生成的图像符合所选画风的特征。"""
+    return f"""You are an AI image prompt generator. Generate English prompts for this description: {user_input}
 
-    return f"""
-你是一位专业的AI绘画提示词工程师，擅长为各种AI绘画工具生成高质量、结构化的提示词。你的任务是生成丰富、详细、多维度的提示词。
+Translate the description to English and generate detailed image prompts.
 
-用户输入：{user_input}{style_instruction}
+Output ONLY these two lines:
 
-请根据以下专业标准，生成详细的提示词：
+[English detailed positive prompt with quality tags and style keywords, translated from: {user_input}]{style_tags}
 
-【专业分析】
-1. 核心主体：分析用户描述的主要对象、特征、属性
-2. 详细描述：添加材质、颜色、纹理、姿态、表情、服装、饰品等细节
-3. 场景环境：描述背景、空间、氛围、时间、天气、季节、地理位置
-4. 光照效果：指定光源类型、方向、强度、阴影、色调、光晕、反射
-5. 艺术风格：{"严格按照用户选择的画风要求" if style else "指定艺术流派、艺术家、媒介（根据需要选择合适风格）"}
-6. 技术参数：分辨率、画质、细节等级、渲染引擎、风格化程度
-7. 构图视角：镜头类型、角度、景深、比例、对称性、黄金分割
-8. 情绪氛围：表达的情感、氛围、故事性、叙事感
+[Standard negative prompt with quality issues to avoid]
 
+Requirements:
+- Translate the description to English in the positive prompt
+- Add relevant visual details, lighting, and composition keywords
+- Include quality tags like: masterpiece, best quality, 8k, ultra detailed
+- Separate all keywords with commas
+- No Chinese text in the output
+- Only output the two lines, nothing else
 
+Example:
+If input is "一只猫坐在窗边", output:
+Line 1: masterpiece, best quality, 8k, ultra detailed, a cute cat sitting by the window, soft natural lighting, cozy atmosphere, detailed fur texture
+Line 2: low quality, worst quality, blurry, bad anatomy, deformed, distorted, disfigured, bad proportions, extra limbs, missing limbs, watermark, text
 
-【结构化输出】
-请以JSON格式返回，包含以下字段：
-{{
-    "positive_prompt": "英文正向提示词（详细版）",
-    "negative_prompt": "英文负向提示词（严格使用以下标准模板，不得添加其他内容）：low quality, worst quality, blurry, bad anatomy, deformed, distorted, disfigured, bad proportions, extra limbs, missing limbs, floating limbs, disconnected limbs, mutation, mutated, ugly, disgusting, amputation, watermark, text, signature, logo, username, artist name, crop, cropped, out of frame, cut off, tiling, poorly drawn feet, poorly drawn face, out of focus, long neck, extra fingers, fewer fingers, bad hands, missing fingers, fused fingers, too many fingers, extra arms, extra legs, extra hands, malformed limbs, bad perspective, warped, error, jpeg artifacts, lowres, monochrome, grayscale",
-    "scene_analysis": "详细的场景分析和建议",
-    "art_style": "艺术风格建议",
-    "lighting": "光照效果建议",
-    
-    
-}}
-
-
-【要求】
-1. 必须返回JSON格式
-2. 所有提示词必须是英文
-3. 每个版本的提示词都要有独特性
-4. 包含足够的细节和修饰词
-5. 符合各AI工具的最佳实践
-6. 生成详细且全面的提示词
-{"7. 必须严格按照用户选择的画风生成提示词" if style else "7. 选择最适合的绘画风格"}
+Just output the two lines. No thinking, no explanation.
 """
 
 def parse_text_response(content, user_input):
-    """最激进的解析 - 提取所有可能的提示词内容"""
-    print(f"使用激进解析，原始内容长度: {len(content)}")  # 调试
+    """解析简单两行格式的提示词"""
+    print(f"解析提示词，原始内容长度: {len(content)}")
+    print(f"原始内容: {content}")
 
-    # 首先尝试提取所有可能的提示词部分
-    # 假设格式是：【正向提示词】内容\n【负向提示词】内容\n...
+    positive = ""
+    negative = ""
 
-    # 尝试用正则表达式提取
-    import re
+    # 清理可能的 markdown 代码块标记
+    content = content.strip()
+    if content.startswith('```'):
+        content = content.split('\n', 1)[-1]
+    if content.endswith('```'):
+        content = content.rsplit('\n', 1)[0]
+    content = content.strip()
 
-    # 提取正向提示词（从【正向提示词】后到下一个【或结尾）
-    positive_match = re.search(r'【正向提示词】\s*(.*?)(?:\n【|$)', content, re.DOTALL)
-    if positive_match:
-        positive = positive_match.group(1).strip()
-    else:
-        # 如果没有找到，尝试提取所有可能的提示词内容
-        #假设提示词内容是逗号分隔的英文短语
-        positive_parts = []
-        for line in content.split('\n'):
-            line = line.strip()
-            if line and len(line) > 10 and not line.startswith('【'):
-                # 检查是否是英文提示词（包含逗号）
-                if ',' in line or len(line.split()) > 2:
-                    positive_parts.append(line)
+    # 按行分割
+    lines = content.split('\n')
+    lines = [line.strip() for line in lines if line.strip()]
 
-        positive = ', '.join(positive_parts) if positive_parts else f"masterpiece, best quality, 8k, ultra detailed, {user_input}"
+    print(f"分割后共 {len(lines)} 行")
 
-    # 提取负向提示词
-    negative_match = re.search(r'【负向提示词】\s*(.*?)(?:\n【|$)', content, re.DOTALL)
-    if negative_match:
-        negative = negative_match.group(1).strip()
-    else:
-        negative = "low quality, blurry, bad anatomy, deformed, watermark, text, ugly"
+    # 直接使用前两行（禁用思考模式后，content 会直接包含答案）
+    if len(lines) > 0:
+        positive = lines[0].strip('"')
+        print(f"第一行（正向）: {positive[:100]}...")
 
-    # 提取分析
-    analysis_match = re.search(r'【.*分析】\s*(.*?)(?:\n【|$)', content, re.DOTALL)
-    if analysis_match:
-        analysis = analysis_match.group(1).strip()
-    else:
-        analysis = f"用户输入: {user_input}"
+    if len(lines) > 1:
+        negative = lines[1].strip('"')
+        print(f"第二行（负向）: {negative[:100]}...")
+
+    # 如果没有提取到，使用默认值
+    if not positive or len(positive) < 5:
+        print("未能提取到正向提示词,使用默认值")
+        positive = f"masterpiece, best quality, 8k, ultra detailed, {user_input}"
+
+    if not negative or len(negative) < 10:
+        print("未能提取到负向提示词,使用默认值")
+        negative = "low quality, worst quality, blurry, bad anatomy, deformed, distorted, disfigured, bad proportions, extra limbs, missing limbs, floating limbs, disconnected limbs, mutation, mutated, ugly, disgusting, amputation, watermark, text, signature, logo, username, artist name, crop, cropped, out of frame, cut off, tiling, poorly drawn feet, poorly drawn face, out of focus, long neck, extra fingers, fewer fingers, bad hands, missing fingers, fused fingers, too many fingers, extra arms, extra legs, extra hands, malformed limbs, bad perspective, warped, error, jpeg artifacts, lowres, monochrome, grayscale"
 
     response_data = {
         "positive_prompt": positive,
         "negative_prompt": negative,
-        "scene_analysis": analysis,
+        "scene_analysis": "",
         "art_style": "",
         "lighting": "",
         "composition": "",
         "technical_notes": ""
     }
 
-    print(f"激进解析完成 - 正向提示词长度: {len(positive)}")  # 调试
+    print(f"解析完成 - 正向提示词长度: {len(positive)}, 负向提示词长度: {len(negative)}")
 
     return jsonify(response_data)
 
@@ -337,63 +386,143 @@ def generate_image():
     if not prompt:
         return jsonify({"error": "请输入提示词"}), 400
 
-    if not VOLC_API_KEY:
+    # 动态获取火山引擎API Key
+    volc_api_key = get_volc_api_key()
+    if not volc_api_key:
         return jsonify({"error": "请先配置火山引擎API Key"}), 400
 
-    headers = {
-        "Authorization": f"Bearer {VOLC_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    # 火山引擎图像生成API - 使用 Seedream 模型
-    payload = {
-        "model": VOLC_IMAGE_MODEL,
-        "prompt": prompt,
-        "sequential_image_generation": "disabled",
-        "response_format": "url",
-        "size": "2K",
-        "stream": False,
-        "watermark": True
-    }
 
     try:
+        # 确定使用的模型：推理接入点ID 或 默认模型名称
+        model_id = VOLC_ENDPOINT_ID if VOLC_ENDPOINT_ID else VOLC_DEFAULT_IMAGE_MODEL
+        model_type = "推理接入点" if VOLC_ENDPOINT_ID else "默认模型"
+
         print(f"调用火山引擎API生成图像,提示词: {prompt}")
+        print(f"使用{model_type}: {model_id}")
+
+        # 构建推理接入点的完整URL
+        # 图像生成推理接入点使用专用端点
+        api_url = f"{VOLC_ENDPOINT_BASE}/api/v3/images/generations"
+
+        headers = {
+            "Authorization": f"Bearer {volc_api_key}",
+            "Content-Type": "application/json"
+        }
+
+        print(f"请求URL: {api_url}")
+        print(f"请求头: {headers}")
+
+        # doubao-seedream 图像生成模型的请求格式
+        payload = {
+            "model": model_id,
+            "prompt": prompt,
+            "sequential_image_generation": "disabled",
+            "response_format": "url",
+            "size": "2K",
+            "stream": False,
+            "watermark": True
+        }
+
+        print(f"请求体: {payload}")
+
 
         response = requests.post(
-            VOLC_IMAGE_API_URL,
+            api_url,
             json=payload,
             headers=headers,
             timeout=60
         )
 
+
         print(f"火山引擎API状态码: {response.status_code}")
 
         if response.status_code == 200:
             result = response.json()
+            print(f"火山引擎API响应: {result}")
+
+            # 解析响应，获取图像URL
+            image_url = ""
+
+            # 图像生成 API 的响应格式
+            # 标准格式：{"data": [{"url": "..."}]}
+            if "data" in result and len(result["data"]) > 0:
+                image_url = result["data"][0].get("url", "")
+
+            # 如果上面没找到，尝试其他格式
+            if not image_url:
+                # 尝试直接在顶层查找 url 字段
+                image_url = result.get("url", "")
+
+            # 再尝试从 images 数组中查找
+            if not image_url and "images" in result and len(result["images"]) > 0:
+                image_url = result["images"][0].get("url", "")
+
+            # 最后尝试从 choices 中查找（兼容旧格式）
+            if not image_url and "choices" in result and len(result["choices"]) > 0:
+                message = result["choices"][0].get("message", {})
+                content = message.get("content", "")
+                if isinstance(content, str):
+                    image_url = content
+                elif isinstance(content, list) and len(content) > 0:
+                    for item in content:
+                        if isinstance(item, dict):
+                            image_url = item.get("image_url", "")
+                            if image_url:
+                                break
+
+            if not image_url:
+                print(f"未能从响应中解析出图像URL，完整响应: {result}")
+                return jsonify({"error": "未能获取图像URL，请检查推理接入点配置\n\n响应结构可能不符合预期"}), 500
 
             # 返回生成的图像URL
             return jsonify({
                 "success": True,
-                "image_url": result.get("data", [{}])[0].get("url", ""),
+                "image_url": image_url,
                 "prompt": prompt,
                 "message": "图像生成成功"
             })
 
+
+        elif response.status_code == 400:
+            error_data = response.json()
+            error_msg = error_data.get("error", {}).get("message", "请求参数错误")
+            print(f"火山引擎400错误详情: {error_data}")
+
+            # 检查是否是模型不支持当前 API 的问题
+            if "does not support this api" in error_msg:
+                model_name = error_data.get("error", {}).get("param", "")
+                return jsonify({
+                    "error": f"模型配置错误\n\n错误信息: {error_msg}\n\n当前使用的模型 ({model_name}) 不支持图像生成API。\n\n解决方案：\n1. 如果使用推理接入点，请检查推理接入点是否配置为图像生成类型\n2. 如果使用默认模型，可以尝试清空推理接入点配置，使用默认的 doubao-seedream 模型\n3. 访问火山引擎ARK控制台: https://console.volcengine.com/ark\n4. 创建或检查图像生成推理接入点（选择支持图像生成的模型如 doubao-seedream 系列）"
+                }), 400
+
+            return jsonify({"error": f"请求参数错误: {error_msg}\n\n请检查：\n1. API Key是否正确\n2. 模型配置是否正确\n3. API请求格式是否正确\n\n完整错误信息: {error_data}"}), 400
         elif response.status_code == 401:
-            return jsonify({"error": "API Key 无效或已过期"}), 401
+            return jsonify({"error": "API Key 无效或已过期\n\n请检查：\n1. 火山引擎API Key是否正确\n2. API Key是否已激活\n3. 账户是否有足够余额"}), 401
+        elif response.status_code == 404:
+            error_data = response.json()
+            error_msg = error_data.get("error", {}).get("message", "推理接入点不存在或无访问权限")
+            return jsonify({"error": f"推理接入点配置错误\n\n{error_msg}\n\n请检查：\n1. 推理接入点ID是否正确（格式：ep-xxxxxx）\n2. 推理接入点是否为图像生成模型\n3. 推理接入点是否已上线运行"}), 404
         elif response.status_code == 429:
-            return jsonify({"error": "API调用频率超限,请稍后再试"}), 429
+            return jsonify({"error": "API调用频率超限，请稍后再试"}), 429
         else:
             error_msg = f"API错误: {response.status_code}"
             print(f"火山引擎API调用失败: {error_msg}, 响应内容: {response.text}")
             return jsonify({"error": error_msg}), 500
+
 
     except requests.exceptions.Timeout:
         print("火山引擎API请求超时")
         return jsonify({"error": "请求超时，请稍后再试"}), 500
     except Exception as e:
         print(f"火山引擎API错误: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": f"生成失败: {str(e)}"}), 500
+
+
+
+
+
 
 @app.route('/api/download_image', methods=['POST'])
 def download_image():
@@ -441,7 +570,7 @@ def save_history():
         # 格式化记录
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # 统一记录格式：包含所有信息
+        # 统一记录格式：只保留基本信息
         record = f"""
 {'='*60}
 时间: {timestamp}
@@ -451,16 +580,6 @@ def save_history():
 正向提示词: {data.get('positive', '')}
 {'-'*60}
 负向提示词: {data.get('negative', '')}
-{'-'*60}
-场景分析: {data.get('scene_analysis', '')}
-{'-'*60}
-艺术风格: {data.get('art_style', '')}
-{'-'*60}
-光照效果: {data.get('lighting', '')}
-{'-'*60}
-构图建议: {data.get('composition', '')}
-{'-'*60}
-技术备注: {data.get('technical_notes', '')}
 {'-'*60}
 """
 
@@ -542,7 +661,7 @@ def internal_error(error):
 
 if __name__ == '__main__':
     # 检查API Key是否设置
-    if not API_KEY:
-        print("API Key未设置，请通过启动器设置")
+    if not get_api_key():
+        print("API Key未设置，请通过启动器设置或通过环境变量设置")
 
     app.run(debug=False, port=5000, host='127.0.0.1', use_reloader=False)
